@@ -16,6 +16,7 @@ cdef extern from "absl/container/flat_hash_map.h" namespace "absl":
         V& operator[](K key)
         size_t size() const
         void clear()
+        void reserve(int64_t value)
 
 cdef class FlatHashMap:
     cdef flat_hash_map[int64_t, vector[int64_t]] _map
@@ -24,6 +25,31 @@ cdef class FlatHashMap:
     cpdef size_t size(self)
     cpdef clear(self)
     cpdef vector[int64_t] get(self, int64_t key)
+
+
+cdef class KVMap:
+    cdef flat_hash_map[int64_t, int64_t] _map
+
+    cpdef count(self, int64_t key, int64_t value)
+    cpdef sum(self, int64_t key, int64_t value)
+    cpdef size_t size(self)
+    cpdef clear(self)
+    cpdef int64_t get(self, int64_t key)
+    cpdef tuple aggregations(self)
+
+from libcpp.string cimport string
+
+cdef class KVMapStr:
+    cdef flat_hash_map[string, int64_t] _map
+
+    cpdef count(self, string key, int64_t value)
+    cpdef sum(self, string key, int64_t value)
+    cpdef size_t size(self)
+    cpdef clear(self)
+    cpdef int64_t get(self, string key)
+    cpdef tuple aggregations(self)
+
+
 
 cdef extern from "absl/container/flat_hash_set.h" namespace "absl":
     cdef cppclass flat_hash_set[T]:

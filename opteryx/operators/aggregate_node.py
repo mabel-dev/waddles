@@ -51,7 +51,6 @@ AGGREGATORS = {
     "VARIANCE": "variance",
 }
 
-
 def _is_count_star(aggregates):
     """
     Is the SELECT clause `SELECT COUNT(*)` with no GROUP BY
@@ -115,7 +114,7 @@ def build_aggregations(aggregators):
     return column_map, aggs
 
 
-def _non_group_aggregates(aggregates, table):
+def _non_group_aggregates(aggregates, table, finalize=False):
     """
     If we're not doing a group by, we're just doing aggregations, the pyarrow
     functionality for aggregate doesn't work. So we do the calculation, it's
@@ -135,6 +134,8 @@ def _non_group_aggregates(aggregates, table):
             ):
                 result[aggregate.schema_column.identity] = table.num_rows
                 continue
+            elif finalize:
+                raw_column_values = table[aggregate.schema_column.identity].to_numpy()
             else:
                 raw_column_values = table[column_node.schema_column.identity].to_numpy()
             aggregate_function_name = AGGREGATORS[aggregate.value]
@@ -176,7 +177,6 @@ def extract_evaluations(aggregates):
 
     return evaluatable_nodes
 
-
 class AggregateNode(BasePlanNode):
     def __init__(self, properties: QueryProperties, **parameters):
         BasePlanNode.__init__(self, properties=properties, **parameters)
@@ -205,7 +205,7 @@ class AggregateNode(BasePlanNode):
     def name(self):  # pragma: no cover
         return "Aggregation"
 
-    def execute(self, morsel: pyarrow.Table, **kwargs) -> pyarrow.Table:
+    def _execute(self, morsel: pyarrow.Table, **kwargs) -> pyarrow.Table:
         if morsel == EOS:
             if _is_count_star(self.aggregates):
                 yield _count_star(
@@ -242,4 +242,34 @@ class AggregateNode(BasePlanNode):
             return
 
         self.buffer.append(project(morsel, self.all_identifiers))
+        yield None
+
+
+
+    def execute(self, morsel: pyarrow.Table, **kwargs) -> pyarrow.Table:
+        if morsel == EOS:
+            if _is_count_star(self.aggregates):
+                yield _count_star(
+                    morsel_promise=self.buffer,
+                    column_name=self.aggregates[0].schema_column.identity,
+                )
+                yield EOS
+                return
+
+
+            table = pyarrow.concat_tables(self.buffer, promote_options="none")
+            combined_agg = _non_group_aggregates(self.aggregates, table, finalize=True)
+
+            yield combined_agg
+            yield EOS
+            return
+
+        else:
+            # Allow grouping by functions by evaluating them first
+            if self.evaluatable_nodes:
+                morsel = evaluate_and_append(self.evaluatable_nodes, morsel)
+            morsel = _non_group_aggregates(self.aggregates, morsel)
+            morsel = morsel.select(list(self.column_map.keys()))
+            self.buffer.append(morsel)
+            
         yield None

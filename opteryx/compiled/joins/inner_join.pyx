@@ -77,3 +77,5 @@ cpdef FlatHashMap abs_hash_join_map(relation, list join_columns):
             ht.insert(hash_value, non_null_indices[i])
 
     return ht
+
+

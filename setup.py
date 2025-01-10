@@ -101,6 +101,13 @@ extensions = [
         extra_compile_args=COMPILE_FLAGS + ["-std=c++17"],
     ),
     Extension(
+        name="opteryx.compiled.aggregations.count",
+        sources=["opteryx/compiled/aggregations/count.pyx"],
+        language="c++",
+        include_dirs=include_dirs + ["third_party/abseil"],
+        extra_compile_args=COMPILE_FLAGS + ["-std=c++17"],
+    ),
+    Extension(
         name="opteryx.compiled.joins.cross_join",
         sources=[
             "opteryx/compiled/joins/cross_join.pyx"
